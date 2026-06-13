@@ -4,7 +4,8 @@
     "slug": "mizpah-app",
     "scheme": "mizpah",
     "plugins": [
-      "expo-camera"
+      "expo-camera",
+      "expo-asset"
     ],
     "web": {
       "bundler": "metro"

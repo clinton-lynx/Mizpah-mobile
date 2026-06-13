@@ -11,6 +11,7 @@
   "dependencies": {
     "@types/react": "~18.2.79",
     "expo": "~52.0.0",
+    "expo-asset": "~11.0.5",
     "expo-camera": "~16.0.0",
     "expo-constants": "~17.0.0",
     "expo-linking": "~7.0.0",
