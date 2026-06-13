@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "mizpah-app",
+    "slug": "mizpah-app",
+    "scheme": "mizpah",
+    "plugins": [
+      "expo-camera"
+    ],
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "45bb0b6f-19f0-4450-88a7-e64b992f4831"
+      }
+    },
+    "android": {
+      "package": "com.clinton_lynxx.mizpahapp"
+    }
+  }
+}
