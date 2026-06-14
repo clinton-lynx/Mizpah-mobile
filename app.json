@@ -1,5 +1,6 @@
 {
   "expo": {
+    "newArchEnabled": true,
     "name": "mizpah-app",
     "slug": "mizpah-app",
     "scheme": "mizpah",
@@ -16,7 +17,20 @@
       }
     },
     "android": {
-      "package": "com.clinton_lynxx.mizpahapp"
-    }
+      "package": "com.clinton_lynxx.mizpahapp",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/45bb0b6f-19f0-4450-88a7-e64b992f4831"
+    },
+    "ios": {}
   }
 }
