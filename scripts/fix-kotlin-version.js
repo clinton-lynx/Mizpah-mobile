@@ -4,26 +4,24 @@ const path = require('path');
 const root = process.cwd();
 const targetVersion = '1.9.25';
 
-function replaceInFile(filePath, patterns, to) {
+function replaceInFile(filePath, patterns, replacement) {
   const fullPath = path.join(root, filePath);
+  if (!fs.existsSync(fullPath)) {
+    return;
+  }
+
   const contents = fs.readFileSync(fullPath, 'utf8');
-  if (contents.includes(to)) {
+  if (contents.includes(replacement)) {
     return;
   }
 
   let nextContents = contents;
-  let replaced = false;
-
   for (const pattern of patterns) {
     if (pattern.test(nextContents)) {
-      nextContents = nextContents.replace(pattern, to);
-      replaced = true;
-      break;
+      nextContents = nextContents.replace(pattern, replacement);
+      fs.writeFileSync(fullPath, nextContents);
+      return;
     }
-  }
-
-  if (replaced) {
-    fs.writeFileSync(fullPath, nextContents);
   }
 }
 

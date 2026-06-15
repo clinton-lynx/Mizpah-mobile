@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { mockProfiles } from "../../lib/mockData";
 import type { MatchType, Profile } from "../../types";

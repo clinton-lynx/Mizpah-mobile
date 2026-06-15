@@ -1,7 +1,26 @@
 {
-  "name": "mizpah-app",
+  "name": "mizpah-mobile",
   "version": "1.0.0",
   "main": "expo-router/entry",
+  "dependencies": {
+    "@types/react": "~18.2.79",
+    "expo": "~52.0.0",
+    "expo-asset": "~11.0.5",
+    "expo-camera": "~16.0.18",
+    "expo-constants": "~17.0.8",
+    "expo-linking": "~7.0.5",
+    "expo-router": "~4.0.22",
+    "expo-status-bar": "~2.0.1",
+    "lucide-react-native": "^1.18.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "react-native-svg": "15.8.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.3.3"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -9,23 +28,5 @@
     "web": "expo start --web",
     "postinstall": "node scripts/fix-kotlin-version.js"
   },
-  "dependencies": {
-    "@types/react": "~18.2.79",
-    "expo": "~52.0.0",
-    "expo-asset": "~11.0.5",
-    "expo-camera": "~16.0.0",
-    "expo-constants": "~17.0.0",
-    "expo-linking": "~7.0.0",
-    "expo-router": "~4.0.0",
-    "expo-status-bar": "~2.0.0",
-    "expo-updates": "~0.27.5",
-    "lucide-react-native": "^1.17.0",
-    "react": "18.3.1",
-    "react-native": "0.76.5",
-    "react-native-safe-area-context": "4.12.0",
-    "react-native-screens": "~4.4.0",
-    "typescript": "~5.3.3"
-  },
-  "private": true,
-  "devDependencies": {}
+  "private": true
 }
