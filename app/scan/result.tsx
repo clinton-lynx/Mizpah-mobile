@@ -1,8 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { Profile } from "../../types";
-
 const BG = "#101415";
 const SURFACE = "#1a2023";
 const SURFACE_ALT = "#20282b";
@@ -11,6 +9,24 @@ const RED = "#d95353";
 const WHITE = "#f5fbf9";
 const MUTED = "#bbcac5";
 
+type ProfileLike = {
+  name?: string;
+  bloodType?: string;
+  emergencyContact?: string;
+  allergies?: string[];
+  conditions?: string[];
+  threatLevel?: "high" | "medium" | "low" | string;
+  reason?: string;
+  flaggedBy?: string;
+  lastSeen?: string;
+  description?: string;
+  guardianContact?: string;
+  enrolledAt?: string;
+  status?: string;
+  type?: string;
+  [key: string]: unknown;
+};
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -18,6 +34,18 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+function toDisplayValue(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim().length > 0 ? value : null;
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  return null;
 }
 
 export default function ScanResultScreen() {
@@ -30,16 +58,105 @@ export default function ScanResultScreen() {
     timestamp?: string;
   }>();
 
-  const profile: Profile | null = params.profile ? JSON.parse(params.profile) : null;
-  const confidence = params.confidence ?? "94.1";
-  const camera = params.camera ?? "Medical tent";
+  let profile: ProfileLike | null = null;
+  if (params.profile) {
+    try {
+      profile = JSON.parse(params.profile) as ProfileLike;
+    } catch {
+      profile = null;
+    }
+  }
 
-  const name = profile?.name ?? "Adewale Balogun";
-  const initials = getInitials(name) || "AB";
-  const bloodType = profile?.bloodType ?? "O+";
-  const emergencyContact = profile?.emergencyContact ?? "+234 802 345 6789";
-  const allergies = profile?.allergies?.join(", ") ?? "Penicillin, Latex";
-  const conditions = profile?.conditions?.join(", ") ?? "Type-2 Diabetes";
+  const confidenceValue = Number.parseFloat(params.confidence ?? "");
+  const confidence = Number.isFinite(confidenceValue)
+    ? confidenceValue.toFixed(1)
+    : params.confidence ?? "0.0";
+  const camera = params.camera ?? "Active scan";
+
+  const name =
+    typeof profile?.name === "string" && profile.name.trim().length > 0
+      ? profile.name
+      : "Matched profile";
+  const initials = getInitials(name) || "MP";
+
+  const dataCards = [
+    {
+      key: "bloodType",
+      label: "Blood Type",
+      value: toDisplayValue(profile?.bloodType),
+      emphasis: true,
+    },
+    {
+      key: "emergencyContact",
+      label: "Emergency Contact",
+      value: toDisplayValue(profile?.emergencyContact),
+    },
+    {
+      key: "allergies",
+      label: "Known Allergies",
+      value: Array.isArray(profile?.allergies)
+        ? profile.allergies.filter(Boolean).join(", ")
+        : null,
+      critical: true,
+    },
+    {
+      key: "conditions",
+      label: "Conditions",
+      value: Array.isArray(profile?.conditions)
+        ? profile.conditions.filter(Boolean).join(", ")
+        : null,
+    },
+    {
+      key: "threatLevel",
+      label: "Threat Level",
+      value: toDisplayValue(profile?.threatLevel)?.toUpperCase() ?? null,
+      critical: true,
+    },
+    {
+      key: "reason",
+      label: "Reason",
+      value: toDisplayValue(profile?.reason),
+      critical: true,
+    },
+    {
+      key: "flaggedBy",
+      label: "Flagged By",
+      value: toDisplayValue(profile?.flaggedBy),
+    },
+    {
+      key: "lastSeen",
+      label: "Last Seen",
+      value: toDisplayValue(profile?.lastSeen),
+    },
+    {
+      key: "description",
+      label: "Description",
+      value: toDisplayValue(profile?.description),
+    },
+    {
+      key: "guardianContact",
+      label: "Guardian Contact",
+      value: toDisplayValue(profile?.guardianContact),
+    },
+    {
+      key: "enrolledAt",
+      label: "Enrolled",
+      value: toDisplayValue(profile?.enrolledAt),
+    },
+    {
+      key: "status",
+      label: "Status",
+      value: toDisplayValue(profile?.status),
+    },
+    {
+      key: "type",
+      label: "Profile Type",
+      value: toDisplayValue(profile?.type),
+    },
+  ].filter((card) => card.value !== null && card.value !== "");
+
+  const prominentCard = dataCards.find((card) => card.key === "bloodType");
+  const secondaryCards = dataCards.filter((card) => card.key !== "bloodType");
 
   return (
     <View style={styles.screen}>
@@ -52,7 +169,9 @@ export default function ScanResultScreen() {
           <Text style={styles.checkmark}>✓</Text>
         </View>
         <Text style={styles.matchText}>MATCH FOUND</Text>
-        <Text style={styles.confidenceText}>{confidence}% confidence · {camera}</Text>
+        <Text style={styles.confidenceText}>
+          {confidence}% confidence · {camera}
+        </Text>
       </View>
 
       <View style={styles.profileBlock}>
@@ -60,32 +179,51 @@ export default function ScanResultScreen() {
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <Text style={styles.name}>{name}</Text>
+        {profile?.type || profile?.status ? (
+          <Text style={styles.metaText}>
+            {[profile?.type, profile?.status].filter(Boolean).join(" · ")}
+          </Text>
+        ) : null}
         <View style={styles.badge}>
           <Text style={styles.badgeText}>MEDICAL PROFILE</Text>
         </View>
       </View>
 
       <View style={styles.grid}>
-        <View style={[styles.card, styles.prominentCard]}>
-          <Text style={styles.cardLabel}>Blood Type</Text>
-          <Text style={styles.bloodType}>{bloodType}</Text>
-        </View>
+        {prominentCard ? (
+          <View style={[styles.card, styles.prominentCard]}>
+            <Text style={styles.cardLabel}>{prominentCard.label}</Text>
+            <Text style={styles.bloodType}>{String(prominentCard.value)}</Text>
+          </View>
+        ) : null}
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Emergency Contact</Text>
-          <Text style={styles.cardValue}>{emergencyContact}</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={[styles.cardLabel, styles.criticalLabel]}>Known Allergies</Text>
-          <Text style={[styles.cardValue, styles.criticalValue]}>{allergies}</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Conditions</Text>
-          <Text style={styles.cardValue}>{conditions}</Text>
-        </View>
+        {secondaryCards.map((card) => (
+          <View key={card.key} style={styles.card}>
+            <Text
+              style={[
+                styles.cardLabel,
+                card.critical ? styles.criticalLabel : null,
+              ]}
+            >
+              {card.label}
+            </Text>
+            <Text
+              style={[
+                styles.cardValue,
+                card.critical ? styles.criticalValue : null,
+              ]}
+            >
+              {String(card.value)}
+            </Text>
+          </View>
+        ))}
       </View>
+
+      {dataCards.length === 0 ? (
+        <Text style={styles.emptyState}>
+          No additional profile fields returned by the API.
+        </Text>
+      ) : null}
 
       <Pressable style={styles.ctaButton} onPress={() => {}}>
         <Text style={styles.ctaText}>Call emergency contact</Text>
@@ -173,6 +311,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
+  metaText: {
+    color: MUTED,
+    fontSize: 13,
+    marginBottom: 10,
+    fontFamily: "monospace",
+    letterSpacing: 0.4,
+  },
   badge: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -248,5 +393,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     letterSpacing: 1,
+  },
+  emptyState: {
+    marginTop: 18,
+    color: MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: "monospace",
+    textAlign: "center",
   },
 });

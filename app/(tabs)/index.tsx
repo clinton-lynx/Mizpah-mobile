@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ElementRef } from "react";
 import {
   Animated,
   Easing,
@@ -9,10 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImageManipulator from "expo-image-manipulator";
 import { Camera } from "lucide-react-native";
 
-import { mockProfiles } from "../../lib/mockData";
-import type { Profile } from "../../types";
+import { scanFace } from "../../lib/api";
 
 const TEAL = "#4fb5a7";
 const BG = "#101415";
@@ -66,9 +66,14 @@ export default function ScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusTone, setStatusTone] = useState<
+    "neutral" | "success" | "warning" | "error"
+  >("neutral");
   const scanPulse = useRef(new Animated.Value(0)).current;
   const statusPulse = useRef(new Animated.Value(0)).current;
-  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraRef = useRef<ElementRef<typeof CameraView> | null>(null);
+  const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     requestPermission();
@@ -121,43 +126,114 @@ export default function ScanScreen() {
     return () => loop.stop();
   }, [statusPulse]);
 
-  const handleScan = () => {
+  const clearMessageTimer = () => {
+    if (messageTimer.current) {
+      clearTimeout(messageTimer.current);
+      messageTimer.current = null;
+    }
+  };
+
+  const showTransientMessage = (
+    message: string,
+    tone: "neutral" | "success" | "warning" | "error" = "neutral"
+  ) => {
+    clearMessageTimer();
+    setStatusMessage(message);
+    setStatusTone(tone);
+    messageTimer.current = setTimeout(() => {
+      setStatusMessage(null);
+      setStatusTone("neutral");
+      messageTimer.current = null;
+    }, 1800);
+  };
+
+  const handleScan = async () => {
     if (!permission?.granted || isScanning) {
       return;
     }
 
-    setIsScanning(true);
-    if (scanTimer.current) {
-      clearTimeout(scanTimer.current);
+    const camera = cameraRef.current;
+    if (!camera) {
+      showTransientMessage("Camera is not ready yet", "error");
+      return;
     }
 
-    scanTimer.current = setTimeout(() => {
-      const profile: Profile = mockProfiles[0];
-      setIsScanning(false);
-      router.push({
-        pathname: "/scan/result",
-        params: {
-          matched: "true",
-          confidence: "94.8",
-          profile: JSON.stringify(profile),
-          camera: "Gate A",
-          timestamp: "Just now",
-        },
+    setIsScanning(true);
+    clearMessageTimer();
+    setStatusMessage(null);
+
+    try {
+      const photo = await camera.takePictureAsync({
+        base64: true,
+        quality: 0.5,
+        exif: false,
       });
-    }, 2000);
+
+      if (!photo?.uri) {
+        throw new Error("Camera did not return a captured image.");
+      }
+
+      let base64Image = photo.base64;
+
+      if (!base64Image || base64Image.length > 700 * 1024) {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          photo.uri,
+          [{ resize: { width: 600 } }],
+          {
+            compress: 0.5,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true,
+          }
+        );
+
+        base64Image = manipulated.base64;
+      }
+
+      if (!base64Image) {
+        throw new Error("Unable to prepare image for scanning.");
+      }
+
+      const response = await scanFace(base64Image, "active");
+
+      if (response.matched) {
+        router.push({
+          pathname: "/scan/result",
+          params: {
+            matched: "true",
+            confidence: String(response.confidence),
+            profile: JSON.stringify(response.profile ?? {}),
+          },
+        });
+        return;
+      }
+
+      showTransientMessage("No match found", "warning");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusMessage(message);
+      setStatusTone("error");
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   useEffect(() => {
     return () => {
-      if (scanTimer.current) {
-        clearTimeout(scanTimer.current);
-      }
+      clearMessageTimer();
     };
   }, []);
 
   const statusLabel = isScanning ? "SCANNING..." : "READY";
   const idlePulse = useRef(new Animated.Value(0)).current;
   const bracketPulse = isScanning ? scanPulse : idlePulse;
+  const statusMessageColor =
+    statusTone === "error"
+      ? "#ff8a8a"
+      : statusTone === "warning"
+        ? "#d59a34"
+        : statusTone === "success"
+          ? TEAL
+          : MUTED;
 
   if (!permission) {
     return <View style={styles.screen} />;
@@ -213,7 +289,7 @@ export default function ScanScreen() {
 
       <View style={styles.cameraSection}>
         <View style={styles.viewfinder}>
-          <CameraView style={StyleSheet.absoluteFill} facing="back" />
+          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
           <View style={styles.overlay} />
 
           <CornerBracket position="topLeft" loading={isScanning} pulse={bracketPulse} />
@@ -239,6 +315,11 @@ export default function ScanScreen() {
       </Pressable>
 
       <Text style={styles.tapText}>{isScanning ? "Scanning..." : "Tap to scan"}</Text>
+      {statusMessage ? (
+        <Text style={[styles.messageText, { color: statusMessageColor }]}>
+          {statusMessage}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -297,6 +378,16 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     marginTop: 10,
   },
+  deniedCard: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deniedText: {
+    color: MUTED,
+    fontSize: 16,
+    fontFamily: "monospace",
+  },
   cameraSection: {
     alignItems: "center",
     justifyContent: "center",
@@ -350,54 +441,58 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
   },
   centerLabelWrap: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: "50%",
-    alignItems: "center",
-    marginTop: -10,
-  },
-  centerLabel: {
-    color: "#d7e4df",
-    fontSize: 15,
-    letterSpacing: 1.5,
-    fontFamily: "monospace",
-  },
-  scanButton: {
-    alignSelf: "center",
-    marginTop: 34,
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: TEAL,
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
   },
+  centerLabel: {
+    color: "#e2ece8",
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "monospace",
+    letterSpacing: 1,
+    backgroundColor: "rgba(16, 20, 21, 0.5)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  scanButton: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignSelf: "center",
+    marginTop: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: TEAL,
+    shadowColor: TEAL,
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
   scanButtonPressed: {
-    transform: [{ scale: 0.96 }],
+    opacity: 0.82,
+    transform: [{ scale: 0.97 }],
   },
   scanButtonScanning: {
-    opacity: 0.85,
+    opacity: 0.9,
   },
   tapText: {
-    textAlign: "center",
     marginTop: 14,
     color: MUTED,
     fontSize: 14,
-    letterSpacing: 1.4,
     fontFamily: "monospace",
+    letterSpacing: 0.8,
+    textAlign: "center",
   },
-  deniedCard: {
-    marginTop: 60,
-    padding: 20,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  deniedText: {
-    color: "#d7e4df",
-    fontSize: 16,
+  messageText: {
+    marginTop: 10,
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: "monospace",
+    letterSpacing: 0.4,
   },
 });
